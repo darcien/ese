@@ -41,5 +41,13 @@
 		"vite": "^7.2.6",
 		"vitest": "^4.0.15",
 		"vitest-browser-svelte": "^2.0.1"
+	},
+	"dependencies": {
+		"datatables.net-buttons-dt": "^3.2.6",
+		"datatables.net-colreorder-dt": "^2.1.2",
+		"datatables.net-columncontrol-dt": "^1.2.0",
+		"datatables.net-dt": "^2.3.6",
+		"datatables.net-fixedcolumns-dt": "^5.0.5",
+		"datatables.net-fixedheader-dt": "^4.0.5"
 	}
 }
