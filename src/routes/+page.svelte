@@ -163,13 +163,9 @@
 				</span>
 			{/if}
 		</div>
-		<div class="status-center">
+		<div class="status-center"></div>
+		<div class="status-right">
 			{#if events.length > 0}
-				<label class="status-checkbox">
-					<input type="checkbox" bind:checked={hideEmptyColumns} />
-					Hide empty columns
-				</label>
-
 				<label class="status-checkbox" title="Expand all table rows to show full content">
 					<input
 						type="checkbox"
@@ -178,6 +174,11 @@
 						onclick={handleExpandAllClick}
 					/>
 					Expand all
+				</label>
+
+				<label class="status-checkbox">
+					<input type="checkbox" bind:checked={hideEmptyColumns} />
+					Hide empty columns
 				</label>
 
 				{#if hasAnyJSON}
@@ -204,9 +205,6 @@
 					</label>
 				{/if}
 			{/if}
-		</div>
-		<div class="status-right">
-			<span class="status-item status-hint"> Press Cmd/Ctrl + K for shortcuts </span>
 		</div>
 	</footer>
 </div>
@@ -407,11 +405,6 @@
 
 	.status-error strong {
 		color: #ff6b6b;
-	}
-
-	.status-hint {
-		color: #666;
-		font-style: italic;
 	}
 
 	/* Scrollbar Styling */
