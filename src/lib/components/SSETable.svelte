@@ -307,11 +307,17 @@
 				}
 
 				try {
-					dt.destroy(true);
+					dt.destroy(false);
 				} catch (error) {
 					console.error('Error destroying DataTable:', error);
 				}
 				dt = null;
+
+				// Clear thead and tbody so DataTable can rebuild with correct columns
+				const thead = node.querySelector('thead');
+				const tbodyEl = node.querySelector('tbody');
+				if (thead) thead.innerHTML = '<tr></tr>';
+				if (tbodyEl) tbodyEl.innerHTML = '';
 			}
 		}
 
@@ -364,10 +370,7 @@
 		{#key events}
 			<table use:datatable={tableConfig} class="display compact stripe hover">
 				<thead>
-					<tr>
-						<th></th>
-						<th>#</th>
-					</tr>
+					<tr></tr>
 				</thead>
 				<tbody></tbody>
 			</table>
