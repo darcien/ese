@@ -11,7 +11,7 @@
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let isLeftPanelCollapsed = $state(false);
 	let hideEmptyColumns = $state(true);
-	let parseJSONOverride = $state<boolean | null>(null);
+	let parseJSON = $state(true);
 	let prettyPrintJSON = $state(true);
 	let expandedRows = new SvelteSet<number>();
 
@@ -21,19 +21,6 @@
 
 	// Check if any events have JSON data
 	let hasAnyJSON = $derived(events.some((event) => event.parsedData !== undefined));
-
-	// Auto-enable JSON parsing when most events have JSON data, unless user overrode it
-	let parseJSON = $derived.by(() => {
-		if (parseJSONOverride !== null) {
-			return parseJSONOverride;
-		}
-		if (events.length === 0) {
-			return false;
-		}
-		const jsonCount = events.filter((e) => e.parsedData !== undefined).length;
-		const threshold = events.length * 0.5; // 50% threshold
-		return jsonCount >= threshold;
-	});
 
 	// Auto-parse when rawInput changes (for HMR, reload, sample loading)
 	$effect(() => {
@@ -186,17 +173,8 @@
 						class="status-checkbox"
 						title="Parse data field as JSON and display each field as a column"
 					>
-						<input
-							type="checkbox"
-							checked={parseJSON}
-							onchange={(e) => {
-								parseJSONOverride = e.currentTarget.checked;
-							}}
-						/>
+						<input type="checkbox" bind:checked={parseJSON} />
 						Parse data as JSON
-						<span class="json-count">
-							({events.filter((e) => e.parsedData).length}/{events.length})
-						</span>
 					</label>
 
 					<label class="status-checkbox" title="Pretty print JSON values in table cells">
@@ -449,11 +427,5 @@
 	.status-checkbox input[type='checkbox'] {
 		cursor: pointer;
 		accent-color: #0066cc;
-	}
-
-	.json-count {
-		color: #666;
-		font-size: 0.7rem;
-		margin-left: 0.25rem;
 	}
 </style>
