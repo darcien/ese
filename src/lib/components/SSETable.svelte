@@ -12,6 +12,15 @@
 	import 'datatables.net-fixedheader-dt/css/fixedHeader.dataTables.css';
 	import 'datatables.net-fixedcolumns-dt/css/fixedColumns.dataTables.css';
 
+	// Truncate string to first line or max chars
+	function truncateForPreview(value: string, maxChars: number = 100): string {
+		const firstLine = value.split('\n')[0];
+		if (firstLine.length <= maxChars) {
+			return firstLine;
+		}
+		return firstLine.slice(0, maxChars) + '…';
+	}
+
 	function formatValueForDisplay(value: unknown, prettyPrint: boolean = false): string {
 		if (value === null) return 'null';
 		if (value === undefined) return '-';
@@ -21,18 +30,28 @@
 		return prettyPrint ? JSON.stringify(value, null, 2) : JSON.stringify(value);
 	}
 
+	// Format value for collapsed row preview (never pretty print)
+	function formatValueForPreview(value: unknown): string {
+		const formatted = formatValueForDisplay(value, false);
+		return truncateForPreview(formatted);
+	}
+
 	interface Props {
 		events: SSEEvent[];
 		hideEmptyColumns?: boolean;
 		parseJSON: boolean;
 		prettyPrintJSON?: boolean;
+		expandedRows: Set<number>;
+		onToggleRow: (sequence: number) => void;
 	}
 
 	let {
 		events,
 		hideEmptyColumns = $bindable(true),
 		parseJSON,
-		prettyPrintJSON = $bindable(true)
+		prettyPrintJSON = $bindable(true),
+		expandedRows,
+		onToggleRow
 	}: Props = $props();
 
 	// Check if columns have data
@@ -74,12 +93,24 @@
 		parseJSON,
 		prettyPrintJSON,
 		hasAnyJSON,
-		jsonColumns
+		jsonColumns,
+		expandedRows,
+		expandedRowsSize: expandedRows.size
 	});
 
 	// Build columns configuration from current config
 	function buildColumns(config: typeof tableConfig): ConfigColumns[] {
 		const cols: ConfigColumns[] = [
+			// Toggle column for expand/collapse
+			{
+				title: '',
+				data: null,
+				defaultContent: '',
+				className: 'dt-control',
+				orderable: false,
+				searchable: false,
+				width: '30px'
+			},
 			{
 				title: '#',
 				data: (row: SSEEvent) => row.sequence,
@@ -100,7 +131,8 @@
 					title: col,
 					data: (row: SSEEvent) => {
 						if (row.parsedData && col in row.parsedData) {
-							return formatValueForDisplay(row.parsedData[col], config.prettyPrintJSON);
+							// Use preview format (no pretty print) for main row
+							return formatValueForPreview(row.parsedData[col]);
 						}
 						return '-';
 					}
@@ -109,7 +141,7 @@
 		} else {
 			cols.push({
 				title: 'Data',
-				data: (row: SSEEvent) => row.data,
+				data: (row: SSEEvent) => truncateForPreview(row.data),
 				className: 'dt-data'
 			});
 		}
@@ -131,36 +163,74 @@
 		return cols;
 	}
 
+	// Format child row content for expanded view
+	function formatChildRow(data: SSEEvent, config: typeof tableConfig): string {
+		let content = '<div class="child-row-content">';
+
+		if (config.parseJSON && config.hasAnyJSON && data.parsedData) {
+			// Show each JSON field with pretty printing if enabled
+			for (const col of config.jsonColumns) {
+				if (data.parsedData && col in data.parsedData) {
+					const value = formatValueForDisplay(data.parsedData[col], config.prettyPrintJSON);
+					content += `<div class="child-field"><span class="child-label">${col}:</span><pre class="child-value">${escapeHtml(value)}</pre></div>`;
+				}
+			}
+		} else {
+			// Show raw data with pretty print if it's JSON
+			let displayData = data.data;
+			if (config.prettyPrintJSON && data.parsedData) {
+				try {
+					displayData = JSON.stringify(JSON.parse(data.data), null, 2);
+				} catch {
+					// Keep original if parsing fails
+				}
+			}
+			content += `<div class="child-field"><span class="child-label">Data:</span><pre class="child-value">${escapeHtml(displayData)}</pre></div>`;
+		}
+
+		content += '</div>';
+		return content;
+	}
+
+	function escapeHtml(text: string): string {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
+	}
+
 	// Svelte action for DataTable - handles lifecycle tied to DOM element
 	function datatable(node: HTMLTableElement, config: typeof tableConfig) {
 		let dt: Api<SSEEvent> | null = null;
+		let currentConfig = config;
 
 		function init(cfg: typeof tableConfig) {
 			if (cfg.events.length === 0) return;
 
 			// Calculate available height from container
 			const container = node.closest('.table-container') as HTMLElement | null;
-			const availableHeight = container ? container.clientHeight - 60 : 400; // 60px for search box + padding
+			const availableHeight = container ? container.clientHeight - 60 : 400;
 
 			try {
 				const dtConfig: Config = {
 					data: cfg.events,
 					columns: buildColumns(cfg),
 					paging: false,
-					order: [[0, 'asc']],
+					order: [[1, 'asc']], // Order by sequence column (index 1 now, after toggle column)
 					autoWidth: false,
 					scrollY: `${availableHeight}px`,
 					scrollX: true,
 					scrollCollapse: false,
 					deferRender: true,
 					dom: '<"top"f>rt',
-					colReorder: true,
+					colReorder: {
+						columns: ':not(.dt-control)' // Prevent reordering the toggle column
+					},
 					fixedHeader: {
 						header: true,
 						headerOffset: 48
 					},
 					fixedColumns: {
-						left: 1
+						left: 2
 					},
 					language: {
 						search: 'Search:',
@@ -174,13 +244,68 @@
 				};
 
 				dt = new DataTable(node, dtConfig);
+
+				// Add click handler for expand/collapse
+				const tbody = node.querySelector('tbody');
+				if (tbody) {
+					tbody.addEventListener('click', handleRowClick);
+				}
+
+				// Sync row states with expandedRows Set
+				syncRowStates(cfg);
 			} catch (error) {
 				console.error('Failed to initialize DataTable:', error);
 			}
 		}
 
+		function syncRowStates(cfg: typeof tableConfig) {
+			if (!dt) return;
+			try {
+				const rowCount = dt.rows().count();
+				for (let i = 0; i < rowCount; i++) {
+					const row = dt.row(i);
+					const rowData = row.data() as SSEEvent;
+					const shouldBeExpanded = cfg.expandedRows.has(rowData.sequence);
+					const isExpanded = row.child.isShown();
+
+					if (shouldBeExpanded && !isExpanded) {
+						row.child(formatChildRow(rowData, cfg)).show();
+						const tr = row.node();
+						if (tr) tr.classList.add('dt-hasChild');
+					} else if (!shouldBeExpanded && isExpanded) {
+						row.child.hide();
+						const tr = row.node();
+						if (tr) tr.classList.remove('dt-hasChild');
+					}
+				}
+			} catch (error) {
+				console.error('Error syncing row states:', error);
+			}
+		}
+
+		function handleRowClick(e: Event) {
+			const target = e.target as HTMLElement;
+			const td = target.closest('td.dt-control');
+			if (!td || !dt) return;
+
+			const tr = td.closest('tr');
+			if (!tr) return;
+
+			const row = dt.row(tr);
+			const rowData = row.data() as SSEEvent;
+
+			// Call parent callback to update state
+			onToggleRow(rowData.sequence);
+		}
+
 		function destroy() {
 			if (dt) {
+				// Remove event listener
+				const tbody = node.querySelector('tbody');
+				if (tbody) {
+					tbody.removeEventListener('click', handleRowClick);
+				}
+
 				try {
 					dt.destroy(true);
 				} catch (error) {
@@ -195,9 +320,33 @@
 
 		return {
 			update(newConfig: typeof tableConfig) {
-				// Destroy and reinitialize on any config change
-				destroy();
-				init(newConfig);
+				// Check if only expandedRows changed
+				const jsonColumnsEqual =
+					newConfig.jsonColumns.length === currentConfig.jsonColumns.length &&
+					newConfig.jsonColumns.every((col, idx) => col === currentConfig.jsonColumns[idx]);
+
+				const onlyExpandedRowsChanged =
+					dt &&
+					newConfig.events === currentConfig.events &&
+					newConfig.showEvent === currentConfig.showEvent &&
+					newConfig.showId === currentConfig.showId &&
+					newConfig.showRetry === currentConfig.showRetry &&
+					newConfig.parseJSON === currentConfig.parseJSON &&
+					newConfig.prettyPrintJSON === currentConfig.prettyPrintJSON &&
+					newConfig.hasAnyJSON === currentConfig.hasAnyJSON &&
+					jsonColumnsEqual &&
+					newConfig.expandedRowsSize !== currentConfig.expandedRowsSize;
+
+				if (onlyExpandedRowsChanged) {
+					// Just sync row states without recreating table
+					syncRowStates(newConfig);
+					currentConfig = newConfig;
+				} else {
+					// Full recreation needed
+					destroy();
+					init(newConfig);
+					currentConfig = newConfig;
+				}
 			},
 			destroy() {
 				destroy();
@@ -216,6 +365,7 @@
 			<table use:datatable={tableConfig} class="display compact stripe hover">
 				<thead>
 					<tr>
+						<th></th>
 						<th>#</th>
 					</tr>
 				</thead>
@@ -334,8 +484,36 @@
 		font-family:
 			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 		font-size: 0.8rem;
-		white-space: pre-wrap;
-		word-wrap: break-word;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 300px;
+	}
+
+	:global(table.dataTable tbody td.dt-control) {
+		background-color: #252525;
+	}
+
+	/* Collapsed state: right-pointing arrow (uses border-left) */
+	:global(table.dataTable tbody td.dt-control::before) {
+		border-left-color: #888 !important;
+	}
+
+	:global(table.dataTable tbody td.dt-control:hover::before) {
+		border-left-color: #fff !important;
+	}
+
+	/* Expanded state: down-pointing arrow (uses border-top, left/right are transparent) */
+	:global(table.dataTable tbody tr.dt-hasChild td.dt-control::before) {
+		border-top-color: #0066cc !important;
+		border-left-color: transparent !important;
+		border-right-color: transparent !important;
+	}
+
+	:global(table.dataTable tbody tr.dt-hasChild td.dt-control:hover::before) {
+		border-top-color: #fff !important;
+		border-left-color: transparent !important;
+		border-right-color: transparent !important;
 	}
 
 	:global(table.dataTable tbody td.dt-sequence) {
@@ -357,12 +535,70 @@
 		background-color: #252525;
 	}
 
+	:global(table.dataTable tbody tr.dt-hasChild td) {
+		background-color: #252525;
+		border-bottom-color: #0066cc;
+	}
+
 	:global(table.dataTable.stripe tbody tr.odd td) {
 		background-color: #1a1a1a;
 	}
 
 	:global(table.dataTable.stripe tbody tr.even td) {
 		background-color: #1e1e1e;
+	}
+
+	:global(table.dataTable.stripe tbody tr.odd.dt-hasChild td),
+	:global(table.dataTable.stripe tbody tr.even.dt-hasChild td) {
+		background-color: #252525;
+	}
+
+	/* Child Row Styling */
+	:global(table.dataTable tbody tr.child-row) {
+		background-color: #1a1a1a;
+	}
+
+	:global(table.dataTable tbody tr > td.child) {
+		padding: 0;
+		background-color: #151515;
+		border-left: 3px solid #0066cc;
+	}
+
+	:global(.child-row-content) {
+		padding: 0.75rem 1rem;
+		background-color: #151515;
+	}
+
+	:global(.child-field) {
+		margin-bottom: 0.5rem;
+	}
+
+	:global(.child-field:last-child) {
+		margin-bottom: 0;
+	}
+
+	:global(.child-label) {
+		display: block;
+		font-size: 0.7rem;
+		color: #888;
+		margin-bottom: 0.25rem;
+		font-weight: 600;
+	}
+
+	:global(.child-value) {
+		margin: 0;
+		padding: 0.5rem;
+		background-color: #1e1e1e;
+		border: 1px solid #2a2a2a;
+		border-radius: 3px;
+		font-size: 0.8rem;
+		color: #e0e0e0;
+		white-space: pre-wrap;
+		word-wrap: break-word;
+		max-height: 300px;
+		overflow-y: auto;
+		font-family:
+			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 	}
 
 	/* Fixed Header */
@@ -401,5 +637,19 @@
 
 	:global(.dataTables_scrollBody::-webkit-scrollbar-thumb:hover) {
 		background: #4a4a4a;
+	}
+
+	/* Child value scrollbar */
+	:global(.child-value::-webkit-scrollbar) {
+		width: 6px;
+	}
+
+	:global(.child-value::-webkit-scrollbar-track) {
+		background: #1a1a1a;
+	}
+
+	:global(.child-value::-webkit-scrollbar-thumb) {
+		background: #3a3a3a;
+		border-radius: 3px;
 	}
 </style>

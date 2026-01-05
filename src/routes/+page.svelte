@@ -3,6 +3,7 @@
 	import SSETable from '$lib/components/SSETable.svelte';
 	import { parseSSEStream } from '$lib/utils/sse-parser';
 	import type { SSEEvent } from '$lib/types/sse';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	let rawInput = $state('');
 	let events = $state<SSEEvent[]>([]);
@@ -12,6 +13,11 @@
 	let hideEmptyColumns = $state(true);
 	let parseJSONOverride = $state<boolean | null>(null);
 	let prettyPrintJSON = $state(true);
+	let expandedRows = new SvelteSet<number>();
+
+	// Derive checkbox state from expanded rows
+	let allExpanded = $derived(events.length > 0 && expandedRows.size === events.length);
+	let someExpanded = $derived(expandedRows.size > 0 && expandedRows.size < events.length);
 
 	// Check if any events have JSON data
 	let hasAnyJSON = $derived(events.some((event) => event.parsedData !== undefined));
@@ -55,6 +61,25 @@
 
 	function toggleLeftPanel() {
 		isLeftPanelCollapsed = !isLeftPanelCollapsed;
+	}
+
+	function handleExpandAllClick() {
+		if (allExpanded) {
+			// Collapse all
+			expandedRows.clear();
+		} else {
+			// Expand all
+			expandedRows.clear();
+			events.forEach((e) => expandedRows.add(e.sequence));
+		}
+	}
+
+	function handleToggleRow(sequence: number) {
+		if (expandedRows.has(sequence)) {
+			expandedRows.delete(sequence);
+		} else {
+			expandedRows.add(sequence);
+		}
 	}
 </script>
 
@@ -114,7 +139,14 @@
 					<p>⏳ Parsing...</p>
 				</div>
 			{:else}
-				<SSETable {events} bind:hideEmptyColumns {parseJSON} bind:prettyPrintJSON />
+				<SSETable
+					{events}
+					bind:hideEmptyColumns
+					{parseJSON}
+					bind:prettyPrintJSON
+					{expandedRows}
+					onToggleRow={handleToggleRow}
+				/>
 			{/if}
 		</section>
 	</main>
@@ -136,6 +168,16 @@
 				<label class="status-checkbox">
 					<input type="checkbox" bind:checked={hideEmptyColumns} />
 					Hide empty columns
+				</label>
+
+				<label class="status-checkbox" title="Expand all table rows to show full content">
+					<input
+						type="checkbox"
+						checked={allExpanded}
+						indeterminate={someExpanded}
+						onclick={handleExpandAllClick}
+					/>
+					Expand all
 				</label>
 
 				{#if hasAnyJSON}
