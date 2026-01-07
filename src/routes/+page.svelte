@@ -19,9 +19,6 @@
 	let allExpanded = $derived(events.length > 0 && expandedRows.size === events.length);
 	let someExpanded = $derived(expandedRows.size > 0 && expandedRows.size < events.length);
 
-	// Check if any events have JSON data
-	let hasAnyJSON = $derived(events.some((event) => event.parsedData !== undefined));
-
 	// Auto-parse when rawInput changes (for HMR, reload, sample loading)
 	$effect(() => {
 		// Explicitly read rawInput to track it as a dependency
@@ -152,37 +149,33 @@
 		</div>
 		<div class="status-center"></div>
 		<div class="status-right">
-			{#if events.length > 0}
-				<label class="status-checkbox" title="Expand all table rows to show full content">
-					<input
-						type="checkbox"
-						checked={allExpanded}
-						indeterminate={someExpanded}
-						onclick={handleExpandAllClick}
-					/>
-					Expand all
-				</label>
+			<label class="status-checkbox" title="Expand all table rows to show full content">
+				<input
+					type="checkbox"
+					checked={allExpanded}
+					indeterminate={someExpanded}
+					onclick={handleExpandAllClick}
+				/>
+				Expand all
+			</label>
 
-				<label class="status-checkbox">
-					<input type="checkbox" bind:checked={hideEmptyColumns} />
-					Hide empty columns
-				</label>
+			<label class="status-checkbox">
+				<input type="checkbox" bind:checked={hideEmptyColumns} />
+				Hide empty columns
+			</label>
 
-				{#if hasAnyJSON}
-					<label
-						class="status-checkbox"
-						title="Parse data field as JSON and display each field as a column"
-					>
-						<input type="checkbox" bind:checked={parseJSON} />
-						Parse data as JSON
-					</label>
+			<label
+				class="status-checkbox"
+				title="Parse data field as JSON and display each field as a column"
+			>
+				<input type="checkbox" bind:checked={parseJSON} />
+				Parse data as JSON
+			</label>
 
-					<label class="status-checkbox" title="Pretty print JSON values in table cells">
-						<input type="checkbox" bind:checked={prettyPrintJSON} />
-						Pretty print JSON
-					</label>
-				{/if}
-			{/if}
+			<label class="status-checkbox" title="Pretty print JSON values in table cells">
+				<input type="checkbox" bind:checked={prettyPrintJSON} />
+				Pretty print JSON
+			</label>
 		</div>
 	</footer>
 </div>
