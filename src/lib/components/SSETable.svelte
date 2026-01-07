@@ -221,7 +221,7 @@
 	};
 
 	const formatDisplayData = (data: SSEEvent, prettyPrint: boolean): string => {
-		if (!prettyPrint || !data.parsedData) return data.data;
+		if (!prettyPrint) return data.data;
 
 		try {
 			return JSON.stringify(JSON.parse(data.data), null, 2);
@@ -339,6 +339,9 @@
 						row.child.hide();
 						const tr = row.node();
 						if (tr) tr.classList.remove('dt-hasChild');
+					} else if (shouldBeExpanded && isExpanded) {
+						// Re-render child content for already-expanded rows
+						row.child(formatChildRow(rowData, cfg)).show();
 					}
 				}
 			} catch (error) {
