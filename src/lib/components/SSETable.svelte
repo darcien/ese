@@ -12,6 +12,44 @@
 	import 'datatables.net-fixedheader-dt/css/fixedHeader.dataTables.css';
 	import 'datatables.net-fixedcolumns-dt/css/fixedColumns.dataTables.css';
 
+	interface TableConfig {
+		events: SSEEvent[];
+		showEvent: boolean;
+		showId: boolean;
+		showRetry: boolean;
+		parseJSON: boolean;
+		prettyPrintJSON: boolean;
+		hasAnyJSON: boolean;
+		jsonColumns: string[];
+		expandedRows: Set<number>;
+		expandedRowsSize: number;
+	}
+
+	function escapeHtml(text: string): string {
+		return text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#039;');
+	}
+
+	function buildChildFieldHTML(
+		label: string,
+		value: string,
+		sequence: number,
+		field: string
+	): string {
+		return `
+			<div class="child-field">
+				<div class="child-field-header">
+					<span class="child-label">${escapeHtml(label)}:</span>
+					<button class="copy-btn" data-sequence="${sequence}" data-field="${escapeHtml(field)}">Copy</button>
+				</div>
+				<pre class="child-value">${escapeHtml(value)}</pre>
+			</div>`;
+	}
+
 	// Truncate string to first line or max chars
 	function truncateForPreview(value: string, maxChars: number = 100): string {
 		const firstLine = value.split('\n')[0];
@@ -98,8 +136,21 @@
 		expandedRowsSize: expandedRows.size
 	});
 
+	// Structural config determines if table needs full recreation
+	let structuralConfig = $derived({
+		showEvent,
+		showId,
+		showRetry,
+		parseJSON,
+		hasAnyJSON,
+		jsonColumns: jsonColumns.join(','),
+		eventsLength: events.length
+	});
+
+	let structuralKey = $derived(JSON.stringify(structuralConfig));
+
 	// Build columns configuration from current config
-	function buildColumns(config: typeof tableConfig): ConfigColumns[] {
+	function buildColumns(config: TableConfig): ConfigColumns[] {
 		const cols: ConfigColumns[] = [
 			// Toggle column for expand/collapse
 			{
@@ -163,47 +214,58 @@
 		return cols;
 	}
 
-	// Format child row content for expanded view
-	function formatChildRow(data: SSEEvent, config: typeof tableConfig): string {
-		let content = '<div class="child-row-content">';
+	type ChildField = {
+		label: string;
+		value: string;
+		field: string;
+	};
 
+	const formatDisplayData = (data: SSEEvent, prettyPrint: boolean): string => {
+		if (!prettyPrint || !data.parsedData) return data.data;
+
+		try {
+			return JSON.stringify(JSON.parse(data.data), null, 2);
+		} catch {
+			return data.data;
+		}
+	};
+
+	const getChildFields = (data: SSEEvent, config: TableConfig): ChildField[] => {
 		if (config.parseJSON && config.hasAnyJSON && data.parsedData) {
-			// Show each JSON field with pretty printing if enabled
-			for (const col of config.jsonColumns) {
-				if (data.parsedData && col in data.parsedData) {
-					const value = formatValueForDisplay(data.parsedData[col], config.prettyPrintJSON);
-					content += `<div class="child-field"><span class="child-label">${col}:</span><pre class="child-value">${escapeHtml(value)}</pre></div>`;
-				}
-			}
-		} else {
-			// Show raw data with pretty print if it's JSON
-			let displayData = data.data;
-			if (config.prettyPrintJSON && data.parsedData) {
-				try {
-					displayData = JSON.stringify(JSON.parse(data.data), null, 2);
-				} catch {
-					// Keep original if parsing fails
-				}
-			}
-			content += `<div class="child-field"><span class="child-label">Data:</span><pre class="child-value">${escapeHtml(displayData)}</pre></div>`;
+			return config.jsonColumns
+				.filter((col) => data.parsedData && col in data.parsedData)
+				.map((col) => ({
+					label: col,
+					value: formatValueForDisplay(data.parsedData![col], config.prettyPrintJSON),
+					field: col
+				}));
 		}
 
-		content += '</div>';
-		return content;
-	}
+		return [
+			{
+				label: 'Data',
+				value: formatDisplayData(data, config.prettyPrintJSON),
+				field: 'data'
+			}
+		];
+	};
 
-	function escapeHtml(text: string): string {
-		const div = document.createElement('div');
-		div.textContent = text;
-		return div.innerHTML;
-	}
+	const formatChildRow = (data: SSEEvent, config: TableConfig): string => {
+		const fields = getChildFields(data, config);
+		const fieldsHTML = fields
+			.map(({ label, value, field }) => buildChildFieldHTML(label, value, data.sequence, field))
+			.join('');
+
+		return `<div class="child-row-content">${fieldsHTML}</div>`;
+	};
 
 	// Svelte action for DataTable - handles lifecycle tied to DOM element
-	function datatable(node: HTMLTableElement, config: typeof tableConfig) {
+	function datatable(node: HTMLTableElement, config: TableConfig) {
 		let dt: Api<SSEEvent> | null = null;
 		let currentConfig = config;
+		let currentStructuralKey = structuralKey;
 
-		function init(cfg: typeof tableConfig) {
+		function init(cfg: TableConfig) {
 			if (cfg.events.length === 0) return;
 
 			// Calculate available height from container
@@ -249,6 +311,7 @@
 				const tbody = node.querySelector('tbody');
 				if (tbody) {
 					tbody.addEventListener('click', handleRowClick);
+					tbody.addEventListener('click', handleCopyClick);
 				}
 
 				// Sync row states with expandedRows Set
@@ -258,7 +321,7 @@
 			}
 		}
 
-		function syncRowStates(cfg: typeof tableConfig) {
+		function syncRowStates(cfg: TableConfig) {
 			if (!dt) return;
 			try {
 				const rowCount = dt.rows().count();
@@ -298,12 +361,50 @@
 			onToggleRow(rowData.sequence);
 		}
 
+		function handleCopyClick(e: Event) {
+			const target = e.target as HTMLElement;
+			if (!target.classList.contains('copy-btn')) return;
+
+			e.stopPropagation();
+
+			const sequenceStr = target.getAttribute('data-sequence');
+			const field = target.getAttribute('data-field');
+			if (!sequenceStr || !field) return;
+
+			const sequence = parseInt(sequenceStr, 10);
+			const event = currentConfig.events.find((evt) => evt.sequence === sequence);
+			if (!event) return;
+
+			let textToCopy: string;
+			if (field === 'data') {
+				textToCopy = event.data;
+			} else if (event.parsedData && field in event.parsedData) {
+				textToCopy = formatValueForDisplay(event.parsedData[field], false);
+			} else {
+				return;
+			}
+
+			navigator.clipboard
+				.writeText(textToCopy)
+				.then(() => {
+					const originalText = target.textContent;
+					target.textContent = 'Copied!';
+					setTimeout(() => {
+						target.textContent = originalText;
+					}, 2000);
+				})
+				.catch((err) => {
+					console.error('Failed to copy:', err);
+				});
+		}
+
 		function destroy() {
 			if (dt) {
-				// Remove event listener
+				// Remove event listeners
 				const tbody = node.querySelector('tbody');
 				if (tbody) {
 					tbody.removeEventListener('click', handleRowClick);
+					tbody.removeEventListener('click', handleCopyClick);
 				}
 
 				try {
@@ -325,32 +426,27 @@
 		init(config);
 
 		return {
-			update(newConfig: typeof tableConfig) {
-				// Check if only expandedRows changed
-				const jsonColumnsEqual =
-					newConfig.jsonColumns.length === currentConfig.jsonColumns.length &&
-					newConfig.jsonColumns.every((col, idx) => col === currentConfig.jsonColumns[idx]);
-
-				const onlyExpandedRowsChanged =
-					dt &&
-					newConfig.events === currentConfig.events &&
-					newConfig.showEvent === currentConfig.showEvent &&
-					newConfig.showId === currentConfig.showId &&
-					newConfig.showRetry === currentConfig.showRetry &&
-					newConfig.parseJSON === currentConfig.parseJSON &&
-					newConfig.prettyPrintJSON === currentConfig.prettyPrintJSON &&
-					newConfig.hasAnyJSON === currentConfig.hasAnyJSON &&
-					jsonColumnsEqual &&
-					newConfig.expandedRowsSize !== currentConfig.expandedRowsSize;
-
-				if (onlyExpandedRowsChanged) {
-					// Just sync row states without recreating table
-					syncRowStates(newConfig);
-					currentConfig = newConfig;
-				} else {
-					// Full recreation needed
+			update(newConfig: TableConfig) {
+				// Check if structural config changed (requires full table recreation)
+				if (structuralKey !== currentStructuralKey) {
 					destroy();
 					init(newConfig);
+					currentConfig = newConfig;
+					currentStructuralKey = structuralKey;
+				} else if (dt && newConfig.events !== currentConfig.events) {
+					// Events data changed but structure stayed the same - update data
+					dt.clear();
+					dt.rows.add(newConfig.events);
+					dt.draw();
+					syncRowStates(newConfig);
+					currentConfig = newConfig;
+				} else if (
+					dt &&
+					(newConfig.prettyPrintJSON !== currentConfig.prettyPrintJSON ||
+						newConfig.expandedRowsSize !== currentConfig.expandedRowsSize)
+				) {
+					// Only UI state changed, just sync row states
+					syncRowStates(newConfig);
 					currentConfig = newConfig;
 				}
 			},
@@ -367,19 +463,33 @@
 	</div>
 {:else}
 	<div class="table-container">
-		{#key events}
-			<table use:datatable={tableConfig} class="display compact stripe hover">
-				<thead>
-					<tr></tr>
-				</thead>
-				<tbody></tbody>
-			</table>
-		{/key}
+		<table use:datatable={tableConfig} class="display compact stripe hover">
+			<thead>
+				<tr></tr>
+			</thead>
+			<tbody></tbody>
+		</table>
 	</div>
 {/if}
 
 <style>
 	.table-container {
+		/* CSS Custom Properties for theming */
+		--dt-bg-primary: #1a1a1a;
+		--dt-bg-secondary: #1e1e1e;
+		--dt-bg-elevated: #252525;
+		--dt-bg-child: #151515;
+		--dt-border-primary: #3a3a3a;
+		--dt-border-secondary: #2a2a2a;
+		--dt-border-subtle: #333;
+		--dt-text-primary: #e0e0e0;
+		--dt-text-secondary: #888;
+		--dt-text-tertiary: #666;
+		--dt-text-muted: #999;
+		--dt-accent: #0066cc;
+		--dt-accent-hover: #0080ff;
+		--dt-accent-alpha: rgba(0, 102, 204, 0.15);
+
 		width: 100%;
 		height: 100%;
 		padding: 1rem;
@@ -426,64 +536,64 @@
 		font-style: italic;
 	}
 
-	/* DataTables Dark Theme */
-	:global(.dataTables_wrapper) {
+	/* DataTables Dark Theme - Scoped within table-container */
+	.table-container :global(.dataTables_wrapper) {
 		font-family:
 			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-		color: #e0e0e0;
+		color: var(--dt-text-primary);
 	}
 
-	:global(.dataTables_wrapper .dataTables_filter) {
+	.table-container :global(.dataTables_wrapper .dataTables_filter) {
 		margin-bottom: 0.75rem;
 		font-size: 0.75rem;
-		color: #888;
+		color: var(--dt-text-secondary);
 		float: right;
 	}
 
-	:global(.dataTables_wrapper .dataTables_filter input) {
+	.table-container :global(.dataTables_wrapper .dataTables_filter input) {
 		padding: 0.25rem 0.5rem;
 		margin: 0 0.5rem;
-		background-color: #2a2a2a;
-		color: #e0e0e0;
-		border: 1px solid #3a3a3a;
+		background-color: var(--dt-bg-secondary);
+		color: var(--dt-text-primary);
+		border: 1px solid var(--dt-border-primary);
 		border-radius: 3px;
 		font-size: 0.75rem;
 		font-family: inherit;
 	}
 
-	:global(.dataTables_wrapper .dataTables_filter input:focus) {
+	.table-container :global(.dataTables_wrapper .dataTables_filter input:focus) {
 		outline: none;
-		border-color: #0066cc;
-		box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.15);
+		border-color: var(--dt-accent);
+		box-shadow: 0 0 0 2px var(--dt-accent-alpha);
 	}
 
 	/* Table Styling */
-	:global(table.dataTable) {
+	.table-container :global(table.dataTable) {
 		border-collapse: collapse;
 		font-size: 0.8rem;
 		width: 100%;
-		background-color: #1a1a1a;
-		color: #e0e0e0;
-		border: 1px solid #3a3a3a;
+		background-color: var(--dt-bg-primary);
+		color: var(--dt-text-primary);
+		border: 1px solid var(--dt-border-primary);
 	}
 
-	:global(table.dataTable thead th) {
+	.table-container :global(table.dataTable thead th) {
 		font-weight: 600;
-		background-color: #252525;
-		border: 1px solid #3a3a3a;
+		background-color: var(--dt-bg-elevated);
+		border: 1px solid var(--dt-border-primary);
 		padding: 0.5rem;
 		text-align: left;
-		color: #e0e0e0;
+		color: var(--dt-text-primary);
 		font-size: 0.75rem;
 		white-space: nowrap;
 	}
 
-	:global(table.dataTable tbody td) {
-		border: 1px solid #2a2a2a;
+	.table-container :global(table.dataTable tbody td) {
+		border: 1px solid var(--dt-border-secondary);
 		padding: 0.5rem;
 		vertical-align: top;
-		background-color: #1e1e1e;
-		color: #e0e0e0;
+		background-color: var(--dt-bg-secondary);
+		color: var(--dt-text-primary);
 		font-family:
 			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 		font-size: 0.8rem;
@@ -493,109 +603,140 @@
 		max-width: 300px;
 	}
 
-	:global(table.dataTable tbody td.dt-control) {
-		background-color: #252525;
+	.table-container :global(table.dataTable tbody td.dt-control) {
+		background-color: var(--dt-bg-elevated);
 	}
 
-	/* Collapsed state: right-pointing arrow (uses border-left) */
-	:global(table.dataTable tbody td.dt-control::before) {
-		border-left-color: #888 !important;
+	/* Collapsed state: right-pointing arrow */
+	.table-container :global(table.dataTable tbody td.dt-control::before) {
+		border-left-color: var(--dt-text-secondary) !important;
 	}
 
-	:global(table.dataTable tbody td.dt-control:hover::before) {
+	.table-container :global(table.dataTable tbody td.dt-control:hover::before) {
 		border-left-color: #fff !important;
 	}
 
-	/* Expanded state: down-pointing arrow (uses border-top, left/right are transparent) */
-	:global(table.dataTable tbody tr.dt-hasChild td.dt-control::before) {
-		border-top-color: #0066cc !important;
+	/* Expanded state: down-pointing arrow */
+	.table-container :global(table.dataTable tbody tr.dt-hasChild td.dt-control::before) {
+		border-top-color: var(--dt-accent) !important;
 		border-left-color: transparent !important;
 		border-right-color: transparent !important;
 	}
 
-	:global(table.dataTable tbody tr.dt-hasChild td.dt-control:hover::before) {
+	.table-container :global(table.dataTable tbody tr.dt-hasChild td.dt-control:hover::before) {
 		border-top-color: #fff !important;
 		border-left-color: transparent !important;
 		border-right-color: transparent !important;
 	}
 
-	:global(table.dataTable tbody td.dt-sequence) {
+	.table-container :global(table.dataTable tbody td.dt-sequence) {
 		font-family:
 			system-ui,
 			-apple-system,
 			sans-serif;
 		text-align: center;
 		font-weight: 500;
-		color: #888;
-		background-color: #252525;
+		color: var(--dt-text-secondary);
+		background-color: var(--dt-bg-elevated);
 	}
 
-	:global(table.dataTable tbody td.dt-data) {
+	.table-container :global(table.dataTable tbody td.dt-data) {
 		max-width: 400px;
 	}
 
-	:global(table.dataTable tbody tr:hover td) {
-		background-color: #252525;
+	.table-container :global(table.dataTable tbody tr:hover td) {
+		background-color: var(--dt-bg-elevated);
 	}
 
-	:global(table.dataTable tbody tr.dt-hasChild td) {
-		background-color: #252525;
-		border-bottom-color: #0066cc;
+	.table-container :global(table.dataTable tbody tr.dt-hasChild td) {
+		background-color: var(--dt-bg-elevated);
+		border-bottom-color: var(--dt-accent);
 	}
 
-	:global(table.dataTable.stripe tbody tr.odd td) {
-		background-color: #1a1a1a;
+	.table-container :global(table.dataTable.stripe tbody tr.odd td) {
+		background-color: var(--dt-bg-primary);
 	}
 
-	:global(table.dataTable.stripe tbody tr.even td) {
-		background-color: #1e1e1e;
+	.table-container :global(table.dataTable.stripe tbody tr.even td) {
+		background-color: var(--dt-bg-secondary);
 	}
 
-	:global(table.dataTable.stripe tbody tr.odd.dt-hasChild td),
-	:global(table.dataTable.stripe tbody tr.even.dt-hasChild td) {
-		background-color: #252525;
+	.table-container :global(table.dataTable.stripe tbody tr.odd.dt-hasChild td),
+	.table-container :global(table.dataTable.stripe tbody tr.even.dt-hasChild td) {
+		background-color: var(--dt-bg-elevated);
 	}
 
 	/* Child Row Styling */
-	:global(table.dataTable tbody tr.child-row) {
-		background-color: #1a1a1a;
+	.table-container :global(table.dataTable tbody tr.child-row) {
+		background-color: var(--dt-bg-primary);
 	}
 
-	:global(table.dataTable tbody tr > td.child) {
+	.table-container :global(table.dataTable tbody tr > td.child) {
 		padding: 0;
-		background-color: #151515;
-		border-left: 3px solid #0066cc;
+		background-color: var(--dt-bg-child);
+		border-left: 3px solid var(--dt-accent);
 	}
 
-	:global(.child-row-content) {
+	.table-container :global(.child-row-content) {
 		padding: 0.75rem 1rem;
-		background-color: #151515;
+		background-color: var(--dt-bg-child);
 	}
 
-	:global(.child-field) {
+	.table-container :global(.child-field) {
 		margin-bottom: 0.5rem;
 	}
 
-	:global(.child-field:last-child) {
+	.table-container :global(.child-field-header) {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.25rem;
+		gap: 1rem;
+	}
+
+	.table-container :global(.child-field:last-child) {
 		margin-bottom: 0;
 	}
 
-	:global(.child-label) {
-		display: block;
+	.table-container :global(.child-label) {
 		font-size: 0.7rem;
-		color: #888;
-		margin-bottom: 0.25rem;
+		color: var(--dt-text-secondary);
 		font-weight: 600;
 	}
 
-	:global(.child-value) {
+	.table-container :global(.copy-btn) {
+		position: sticky;
+		right: 1rem;
+		padding: 0.2rem 0.5rem;
+		font-size: 0.65rem;
+		color: var(--dt-text-muted);
+		background-color: var(--dt-bg-elevated);
+		border: 1px solid var(--dt-border-subtle);
+		border-radius: 3px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		font-family: inherit;
+		flex-shrink: 0;
+	}
+
+	.table-container :global(.copy-btn:hover) {
+		color: var(--dt-text-primary);
+		background-color: var(--dt-bg-secondary);
+		border-color: var(--dt-accent);
+	}
+
+	.table-container :global(.copy-btn:active) {
+		transform: scale(0.95);
+	}
+
+	.table-container :global(.child-value) {
 		margin: 0;
 		padding: 0.5rem;
-		background-color: #1e1e1e;
-		border: 1px solid #2a2a2a;
+		background-color: var(--dt-bg-secondary);
+		border: 1px solid var(--dt-border-secondary);
 		border-radius: 3px;
 		font-size: 0.8rem;
-		color: #e0e0e0;
+		color: var(--dt-text-primary);
 		white-space: pre-wrap;
 		word-wrap: break-word;
 		max-height: 300px;
@@ -605,54 +746,54 @@
 	}
 
 	/* Fixed Header */
-	:global(.fixedHeader-floating) {
-		background-color: #252525;
-		border: 1px solid #3a3a3a;
+	.table-container :global(.fixedHeader-floating) {
+		background-color: var(--dt-bg-elevated);
+		border: 1px solid var(--dt-border-primary);
 	}
 
-	:global(.fixedHeader-floating th) {
-		background-color: #252525;
-		border: 1px solid #3a3a3a;
-		color: #e0e0e0;
+	.table-container :global(.fixedHeader-floating th) {
+		background-color: var(--dt-bg-elevated);
+		border: 1px solid var(--dt-border-primary);
+		color: var(--dt-text-primary);
 	}
 
 	/* Fixed Columns */
-	:global(.dtfc-fixed-left),
-	:global(.dtfc-fixed-right) {
-		background-color: #252525;
-		border-right: 2px solid #0066cc;
+	.table-container :global(.dtfc-fixed-left),
+	.table-container :global(.dtfc-fixed-right) {
+		background-color: var(--dt-bg-elevated);
+		border-right: 2px solid var(--dt-accent);
 	}
 
 	/* Scrollbar */
-	:global(.dataTables_scrollBody::-webkit-scrollbar) {
+	.table-container :global(.dataTables_scrollBody::-webkit-scrollbar) {
 		width: 8px;
 		height: 8px;
 	}
 
-	:global(.dataTables_scrollBody::-webkit-scrollbar-track) {
-		background: #1a1a1a;
+	.table-container :global(.dataTables_scrollBody::-webkit-scrollbar-track) {
+		background: var(--dt-bg-primary);
 	}
 
-	:global(.dataTables_scrollBody::-webkit-scrollbar-thumb) {
-		background: #3a3a3a;
+	.table-container :global(.dataTables_scrollBody::-webkit-scrollbar-thumb) {
+		background: var(--dt-border-primary);
 		border-radius: 4px;
 	}
 
-	:global(.dataTables_scrollBody::-webkit-scrollbar-thumb:hover) {
+	.table-container :global(.dataTables_scrollBody::-webkit-scrollbar-thumb:hover) {
 		background: #4a4a4a;
 	}
 
 	/* Child value scrollbar */
-	:global(.child-value::-webkit-scrollbar) {
+	.table-container :global(.child-value::-webkit-scrollbar) {
 		width: 6px;
 	}
 
-	:global(.child-value::-webkit-scrollbar-track) {
-		background: #1a1a1a;
+	.table-container :global(.child-value::-webkit-scrollbar-track) {
+		background: var(--dt-bg-primary);
 	}
 
-	:global(.child-value::-webkit-scrollbar-thumb) {
-		background: #3a3a3a;
+	.table-container :global(.child-value::-webkit-scrollbar-thumb) {
+		background: var(--dt-border-primary);
 		border-radius: 3px;
 	}
 </style>
