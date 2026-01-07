@@ -289,7 +289,7 @@
 					},
 					fixedHeader: {
 						header: true,
-						headerOffset: 48
+						headerOffset: 36
 					},
 					fixedColumns: {
 						left: 2

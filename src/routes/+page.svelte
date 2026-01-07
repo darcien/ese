@@ -68,13 +68,13 @@
 </script>
 
 <svelte:head>
-	<title>SSE Stream Viewer</title>
+	<title>ese - event stream explorer</title>
 </svelte:head>
 
 <div class="app-container">
 	<!-- Header -->
 	<header class="app-header">
-		<h1>SSE Stream Viewer</h1>
+		<h1>ese - event stream explorer</h1>
 	</header>
 
 	<!-- Main Content Area -->
@@ -116,11 +116,12 @@
 		<section class="right-panel">
 			{#if rawInput.trim().length === 0}
 				<div class="empty-state">
-					<p>👈 Paste SSE stream or load a sample</p>
+					<p>no input</p>
+					<p>paste stream or load sample</p>
 				</div>
 			{:else if events.length === 0 && parseErrors.length === 0}
 				<div class="empty-state">
-					<p>⏳ Parsing...</p>
+					<p>parsing stream...</p>
 				</div>
 			{:else}
 				<SSETable
@@ -204,7 +205,7 @@
 	/* Header */
 	.app-header {
 		flex-shrink: 0;
-		height: 48px;
+		height: 36px;
 		padding: 0 1rem;
 		display: flex;
 		align-items: center;
@@ -214,7 +215,7 @@
 
 	.app-header h1 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: #ffffff;
 		letter-spacing: 0.5px;
@@ -301,6 +302,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		flex-direction: column;
 		height: 100%;
 		color: #666;
 		font-size: 1rem;

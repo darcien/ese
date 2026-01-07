@@ -19,7 +19,7 @@
 
 <div class="input-container">
 	<div class="input-header">
-		<label for="sse-input" class="input-label">SSE Stream Input</label>
+		<label for="sse-input" class="input-label">Event Stream Input</label>
 		<div class="sample-controls">
 			<label for="sample-select" class="sample-label">Sample:</label>
 			<select id="sample-select" bind:value={selectedSampleId} class="sample-select">
