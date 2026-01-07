@@ -185,8 +185,6 @@
 		margin: 0;
 		padding: 0;
 		overflow: hidden;
-		font-family:
-			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 		background-color: #1a1a1a;
 		color: #e0e0e0;
 	}

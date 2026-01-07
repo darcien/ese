@@ -1,2 +1,11 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
+
+:root {
+	--font-mono:
+		'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+body {
+	font-family: var(--font-mono);
+}

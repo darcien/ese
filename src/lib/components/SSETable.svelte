@@ -538,8 +538,7 @@
 
 	/* DataTables Dark Theme - Scoped within table-container */
 	.table-container :global(.dataTables_wrapper) {
-		font-family:
-			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+		font-family: var(--font-mono);
 		color: var(--dt-text-primary);
 	}
 
@@ -594,8 +593,7 @@
 		vertical-align: top;
 		background-color: var(--dt-bg-secondary);
 		color: var(--dt-text-primary);
-		font-family:
-			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+		font-family: var(--font-mono);
 		font-size: 0.8rem;
 		white-space: nowrap;
 		overflow: hidden;
@@ -630,10 +628,7 @@
 	}
 
 	.table-container :global(table.dataTable tbody td.dt-sequence) {
-		font-family:
-			system-ui,
-			-apple-system,
-			sans-serif;
+		font-family: var(--font-mono);
 		text-align: center;
 		font-weight: 500;
 		color: var(--dt-text-secondary);
@@ -741,8 +736,7 @@
 		word-wrap: break-word;
 		max-height: 300px;
 		overflow-y: auto;
-		font-family:
-			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+		font-family: var(--font-mono);
 	}
 
 	/* Fixed Header */

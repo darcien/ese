@@ -147,8 +147,7 @@
 		color: #e0e0e0;
 		border: 1px solid #3a3a3a;
 		border-radius: 4px;
-		font-family:
-			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+		font-family: var(--font-mono);
 		font-size: 0.875rem;
 		line-height: 1.5;
 		resize: none;
