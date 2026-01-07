@@ -6,6 +6,38 @@
 		'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
+* {
+	box-sizing: border-box;
+}
+
 body {
 	font-family: var(--font-mono);
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	background-color: #1a1a1a;
+	color: #e0e0e0;
+}
+
+/* Scrollbar Styling */
+.panel-content::-webkit-scrollbar,
+.right-panel::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+.panel-content::-webkit-scrollbar-track,
+.right-panel::-webkit-scrollbar-track {
+	background: #1a1a1a;
+}
+
+.panel-content::-webkit-scrollbar-thumb,
+.right-panel::-webkit-scrollbar-thumb {
+	background: #3a3a3a;
+	border-radius: 4px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover,
+.right-panel::-webkit-scrollbar-thumb:hover {
+	background: #4a4a4a;
 }

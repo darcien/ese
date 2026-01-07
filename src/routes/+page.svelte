@@ -182,18 +182,6 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		padding: 0;
-		overflow: hidden;
-		background-color: #1a1a1a;
-		color: #e0e0e0;
-	}
-
-	:global(*) {
-		box-sizing: border-box;
-	}
-
 	.app-container {
 		display: flex;
 		flex-direction: column;
@@ -376,29 +364,6 @@
 
 	.status-error strong {
 		color: #ff6b6b;
-	}
-
-	/* Scrollbar Styling */
-	:global(.panel-content::-webkit-scrollbar),
-	:global(.right-panel::-webkit-scrollbar) {
-		width: 8px;
-		height: 8px;
-	}
-
-	:global(.panel-content::-webkit-scrollbar-track),
-	:global(.right-panel::-webkit-scrollbar-track) {
-		background: #1a1a1a;
-	}
-
-	:global(.panel-content::-webkit-scrollbar-thumb),
-	:global(.right-panel::-webkit-scrollbar-thumb) {
-		background: #3a3a3a;
-		border-radius: 4px;
-	}
-
-	:global(.panel-content::-webkit-scrollbar-thumb:hover),
-	:global(.right-panel::-webkit-scrollbar-thumb:hover) {
-		background: #4a4a4a;
 	}
 
 	/* Status bar controls */
