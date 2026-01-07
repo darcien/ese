@@ -1,0 +1,72 @@
+
+@font-face {
+	font-family: 'Iosevka Ese Web';
+	font-display: swap;
+	font-weight: 400;
+	font-stretch: normal;
+	font-style: normal;
+	src: url('WOFF2/IosevkaEse-Regular.woff2') format('woff2'), url('TTF/IosevkaEse-Regular.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese Web';
+	font-display: swap;
+	font-weight: 400;
+	font-stretch: expanded;
+	font-style: normal;
+	src: url('WOFF2/IosevkaEse-Extended.woff2') format('woff2'), url('TTF/IosevkaEse-Extended.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese Web';
+	font-display: swap;
+	font-weight: 400;
+	font-stretch: normal;
+	font-style: italic;
+	src: url('WOFF2/IosevkaEse-Italic.woff2') format('woff2'), url('TTF/IosevkaEse-Italic.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese Web';
+	font-display: swap;
+	font-weight: 400;
+	font-stretch: expanded;
+	font-style: italic;
+	src: url('WOFF2/IosevkaEse-ExtendedItalic.woff2') format('woff2'), url('TTF/IosevkaEse-ExtendedItalic.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese Web';
+	font-display: swap;
+	font-weight: 700;
+	font-stretch: normal;
+	font-style: normal;
+	src: url('WOFF2/IosevkaEse-Bold.woff2') format('woff2'), url('TTF/IosevkaEse-Bold.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese Web';
+	font-display: swap;
+	font-weight: 700;
+	font-stretch: expanded;
+	font-style: normal;
+	src: url('WOFF2/IosevkaEse-ExtendedBold.woff2') format('woff2'), url('TTF/IosevkaEse-ExtendedBold.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese Web';
+	font-display: swap;
+	font-weight: 700;
+	font-stretch: normal;
+	font-style: italic;
+	src: url('WOFF2/IosevkaEse-BoldItalic.woff2') format('woff2'), url('TTF/IosevkaEse-BoldItalic.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese Web';
+	font-display: swap;
+	font-weight: 700;
+	font-stretch: expanded;
+	font-style: italic;
+	src: url('WOFF2/IosevkaEse-ExtendedBoldItalic.woff2') format('woff2'), url('TTF/IosevkaEse-ExtendedBoldItalic.ttf') format('truetype');
+}

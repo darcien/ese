@@ -1,9 +1,37 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 
+@font-face {
+	font-family: 'Iosevka Ese';
+	font-display: swap;
+	font-weight: 400;
+	font-stretch: normal;
+	font-style: normal;
+	src: url('/fonts/IosevkaEse/WOFF2/IosevkaEse-Regular.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese';
+	font-display: swap;
+	font-weight: 400;
+	font-stretch: normal;
+	font-style: italic;
+	src: url('/fonts/IosevkaEse/WOFF2/IosevkaEse-Italic.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Iosevka Ese';
+	font-display: swap;
+	font-weight: 700;
+	font-stretch: normal;
+	font-style: normal;
+	src: url('/fonts/IosevkaEse/WOFF2/IosevkaEse-Bold.woff2') format('woff2');
+}
+
 :root {
 	--font-mono:
-		'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+		'Iosevka Ese', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+		monospace;
 }
 
 * {

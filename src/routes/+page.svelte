@@ -207,6 +207,8 @@
 		font-weight: 600;
 		color: #ffffff;
 		letter-spacing: 0.5px;
+		line-height: 1;
+		padding-bottom: 2px;
 	}
 
 	/* Main Content */
@@ -336,6 +338,8 @@
 		border-top: 1px solid #3a3a3a;
 		font-size: 0.75rem;
 		color: #888;
+		line-height: 1;
+		padding-bottom: 1px;
 	}
 
 	.status-left,
@@ -371,7 +375,6 @@
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
-		font-size: 0.75rem;
 		color: #888;
 		cursor: pointer;
 		user-select: none;

@@ -495,24 +495,24 @@
 
 		width: 100%;
 		height: 100%;
-		padding: 1rem;
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
 	}
 
-	.table-container :global(.dataTables_wrapper) {
+	.table-container :global(.dt-container) {
 		display: flex;
 		flex-direction: column;
 		height: 100%;
 		overflow: hidden;
 	}
 
-	.table-container :global(.dataTables_wrapper .top) {
+	.table-container :global(.dt-container .top) {
 		flex-shrink: 0;
+		padding: 0.5rem;
 	}
 
-	.table-container :global(.dataTables_scroll) {
+	.table-container :global(.dt-scroll) {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
@@ -520,11 +520,11 @@
 		min-height: 0;
 	}
 
-	.table-container :global(.dataTables_scrollHead) {
+	.table-container :global(.dt-scroll-head) {
 		flex-shrink: 0;
 	}
 
-	.table-container :global(.dataTables_scrollBody) {
+	.table-container :global(.dt-scroll-body) {
 		flex: 1;
 		overflow: auto !important;
 		min-height: 0;
@@ -540,19 +540,17 @@
 	}
 
 	/* DataTables Dark Theme - Scoped within table-container */
-	.table-container :global(.dataTables_wrapper) {
+	.table-container :global(.dt-container) {
 		font-family: var(--font-mono);
 		color: var(--dt-text-primary);
 	}
 
-	.table-container :global(.dataTables_wrapper .dataTables_filter) {
-		margin-bottom: 0.75rem;
+	.table-container :global(.dt-search) {
 		font-size: 0.75rem;
 		color: var(--dt-text-secondary);
-		float: right;
 	}
 
-	.table-container :global(.dataTables_wrapper .dataTables_filter input) {
+	.table-container :global(.dt-search input) {
 		padding: 0.25rem 0.5rem;
 		margin: 0 0.5rem;
 		background-color: var(--dt-bg-secondary);
@@ -563,7 +561,7 @@
 		font-family: inherit;
 	}
 
-	.table-container :global(.dataTables_wrapper .dataTables_filter input:focus) {
+	.table-container :global(.dt-search input:focus) {
 		outline: none;
 		border-color: var(--dt-accent);
 		box-shadow: 0 0 0 2px var(--dt-accent-alpha);
@@ -665,8 +663,8 @@
 	}
 
 	/* Child Row Styling */
-	.table-container :global(table.dataTable tbody tr.child-row) {
-		background-color: var(--dt-bg-primary);
+	.table-container :global(table.dataTable tbody tr.dt-hasChild + tr td) {
+		padding: 0;
 	}
 
 	.table-container :global(table.dataTable tbody tr > td.child) {
@@ -676,7 +674,7 @@
 	}
 
 	.table-container :global(.child-row-content) {
-		padding: 0.75rem 1rem;
+		padding: 0.5rem;
 		background-color: var(--dt-bg-child);
 	}
 
@@ -704,7 +702,7 @@
 
 	.table-container :global(.copy-btn) {
 		position: sticky;
-		right: 1rem;
+		right: 0.5rem;
 		padding: 0.2rem 0.5rem;
 		font-size: 0.65rem;
 		color: var(--dt-text-muted);
