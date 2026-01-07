@@ -141,7 +141,7 @@
 	.sse-textarea {
 		flex: 1;
 		width: 100%;
-		min-width: 80ch;
+		min-width: 60ch;
 		padding: 0.75rem;
 		background-color: #252525;
 		color: #e0e0e0;

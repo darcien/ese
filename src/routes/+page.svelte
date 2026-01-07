@@ -223,7 +223,7 @@
 	.left-panel {
 		position: relative;
 		flex-shrink: 0;
-		width: calc(80ch + 2rem);
+		width: calc(60ch + 2rem);
 		background-color: #1e1e1e;
 		border-right: 1px solid #3a3a3a;
 		display: flex;
@@ -338,8 +338,6 @@
 		border-top: 1px solid #3a3a3a;
 		font-size: 0.75rem;
 		color: #888;
-		line-height: 1;
-		padding-bottom: 1px;
 	}
 
 	.status-left,
@@ -359,6 +357,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
+		line-height: 1;
 	}
 
 	.status-item strong {
@@ -375,6 +374,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
+		font-size: 0.75rem;
 		color: #888;
 		cursor: pointer;
 		user-select: none;
